@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#000"/>
+  <g transform="translate(56 56)">
+    <rect x="0.00" y="0.00" width="133.83" height="133.83" fill="#bba3e2"/><rect x="133.33" y="0.00" width="133.83" height="133.83" fill="#bba3e2"/><rect x="266.67" y="0.00" width="133.83" height="133.83" fill="#ffc992"/><rect x="0.00" y="133.33" width="133.83" height="133.83" fill="#96beff"/><rect x="133.33" y="133.33" width="133.83" height="133.83" fill="#b3dfa0"/><rect x="266.67" y="133.33" width="133.83" height="133.83" fill="#ffc992"/><rect x="0.00" y="266.67" width="133.83" height="133.83" fill="#96beff"/><rect x="133.33" y="266.67" width="133.83" height="133.83" fill="#b3dfa0"/><rect x="266.67" y="266.67" width="133.83" height="133.83" fill="#b3dfa0"/>
+    <path d="M133.33 0v400M266.67 0v400M0 133.33h400M0 266.67h400" stroke="#000" stroke-width="10"/>
+    <g transform="translate(140 136.25) scale(5)" fill="#000">
+      <path d="M2.5 7.5l5 4.2L12 4l4.5 7.7 5-4.2L19.3 18H4.7L2.5 7.5z"/>
+      <rect x="4.7" y="19.2" width="14.6" height="2.3" rx="1"/>
+    </g>
+  </g>
+</svg>
