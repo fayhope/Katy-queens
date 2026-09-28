@@ -1,10 +1,10 @@
 // Offline support: serve the app shell from cache when there's no network.
 // Network-first so updates show up as soon as you're online. Bump VERSION
 // when you change files if you want old caches cleaned up straight away.
-const VERSION = 'kq-v1';
+const VERSION = 'kq-v2';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
-  'js/app.js', 'js/config.js', 'js/parser.js', 'js/queens.js', 'js/stats.js', 'js/store.js',
+  'js/app.js', 'js/code.js', 'js/config.js', 'js/parser.js', 'js/queens.js', 'js/stats.js', 'js/store.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

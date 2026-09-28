@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { EMPTY, CROSS, QUEEN, findConflicts, isSolved, attackedCells, solve, validateRegions, normalizeRegions } from './queens.js';
 import { fileToImage, detectBoard, detectGridSize, extractPuzzle, clampBox, MIN_SIZE, MAX_SIZE } from './parser.js';
 import { dateKey, prettyDate, formatTime, parseTime, streaks, leaderboard } from './stats.js';
+import { parseCode } from './code.js';
 import * as store from './store.js';
 
 // ---------- icons ----------
@@ -16,6 +17,7 @@ const ICONS = {
   auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l5 5M11 6l-5 5M13 13l5 5M18 13l-5 5"/><path d="M15 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="currentColor"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 17v3h16v-3"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  paste: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>',
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3L2 20h20L12 3zM12 10v4M12 17v.5"/></svg>',
 };
 
@@ -69,11 +71,23 @@ async function boot() {
   document.addEventListener('visibilitychange', onVisibility);
 
   const initial = location.hash === '#leaderboard' ? 'leaderboard' : 'play';
+  const linkCode = codeFromHash();
   show(initial);
   await loadDay();
+  if (linkCode) openCode(linkCode);
+  window.addEventListener('hashchange', () => { const c = codeFromHash(); if (c) openCode(c); });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+}
+
+// Links from Claude look like https://<site>/#q=POOOOOO.POOOBBO...
+// Optional &d=YYYY-MM-DD picks the day (defaults to today).
+function codeFromHash() {
+  const m = location.hash.match(/[#&]q=([^&]+)/);
+  if (!m) return null;
+  const d = location.hash.match(/[#&]d=(\d{4}-\d{2}-\d{2})/);
+  return { code: decodeURIComponent(m[1]), date: d ? d[1] : null };
 }
 
 async function loadDay() {
@@ -130,12 +144,15 @@ function onVisibility() {
     return;
   }
   if (state.view === 'play') startClockIfPlaying();
+  if (!state.puzzle && state.view === 'play') {
+    store.loadPuzzle(state.date).then(p => { if (p && !state.puzzle) { setPuzzle(p); render(); } });
+  }
   store.loadResults().then(r => { state.results = r; renderStreakPill(); if (state.view === 'leaderboard') render(); });
 }
 
 function show(view) {
   state.view = view;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view || (view === 'import' && t.dataset.view === 'play')));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view || (['import', 'sent'].includes(view) && t.dataset.view === 'play')));
   history.replaceState(null, '', view === 'leaderboard' ? '#leaderboard' : location.pathname + location.search);
   if (view !== 'play') pauseClock();
   render();
@@ -145,6 +162,7 @@ function show(view) {
 function render() {
   if (state.view === 'leaderboard') return renderLeaderboard();
   if (state.view === 'import') return renderImport();
+  if (state.view === 'sent') return renderSent();
   return renderPlay();
 }
 
@@ -251,10 +269,8 @@ function renderPlay() {
   const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
   bind('practiceBtn', startPractice);
   bind('endPracticeBtn', endPractice);
-  bind('replaceBtn', () => {
-    if (state.marks.some(m => m !== EMPTY) && !confirm('Replace today\'s puzzle? Your progress on this board will be lost.')) return;
-    $fileInput.click();
-  });
+  const okToReplace = () => !state.marks.some(m => m !== EMPTY) || confirm('Replace today\'s puzzle? Your progress on this board will be lost.');
+  bind('replaceBtn', () => { if (okToReplace()) $fileInput.click(); });
   bind('lbBtn', () => show('leaderboard'));
   startClockIfPlaying();
 }
@@ -267,11 +283,17 @@ function renderEmpty() {
       <div class="hero-board" aria-hidden="true">
         ${demo.map((g, i) => `<span style="background:${demoColours[g]}">${i === 4 ? ICONS.crown : ''}</span>`).join('')}
       </div>
-      <h1>No puzzle yet today</h1>
-      <p>Open Queens on LinkedIn, screenshot the board before you start, then upload it here to play.</p>
-      <button class="btn primary" id="uploadBtn" type="button">${ICONS.upload}Upload screenshot</button>
+      <h1>Today's puzzle is on its way</h1>
+      <p>Today's board will appear here as soon as it's ready. Check back in a little while!</p>
+      <div class="row" style="justify-content:center;flex-wrap:wrap">
+        <button class="btn primary" id="refreshBtn" type="button">Check again</button>
+      </div>
     </div>
-    <p class="how center">Tip: after uploading, you get a chance to check the board and fix any colours.</p>`;
+    <p class="how center">Can't wait? <button class="linklike" id="uploadBtn" type="button">Upload a screenshot of the board yourself</button>.</p>`;
+  document.getElementById('refreshBtn').onclick = async () => {
+    const p = await store.loadPuzzle(state.date);
+    if (p) { setPuzzle(p); renderPlay(); } else toast('Not there yet — try again soon.');
+  };
   document.getElementById('uploadBtn').onclick = () => $fileInput.click();
 }
 
@@ -540,12 +562,13 @@ function renderImport() {
   if (!imp) { state.view = 'play'; return renderPlay(); }
   const { puzzle } = imp;
   const check = importCheck(puzzle);
+  const fromImage = Boolean(imp.image);
   $app.innerHTML = `
     <div class="card">
-      <h2>Check the board <small>· ${esc(prettyDate(state.date))}</small></h2>
+      <h2>${imp.fromLink ? `Puzzle for ${esc(CONFIG.player)}` : 'Check the board'} <small>· ${esc(prettyDate(imp.date || state.date))}</small></h2>
       <div class="board-wrap"><div class="board" id="board"></div></div>
       <div class="status ${check.level}">${check.level === 'ok' ? ICONS.check : ICONS.warn}<span>${esc(check.text)}</span></div>
-      <div class="row">
+      ${fromImage ? `<div class="row">
         <span class="small muted">Grid size</span>
         <span class="spacer"></span>
         <div class="stepper">
@@ -553,43 +576,71 @@ function renderImport() {
           <span>${puzzle.size} × ${puzzle.size}</span>
           <button type="button" id="sizeUp" aria-label="Bigger grid">+</button>
         </div>
-      </div>
+      </div>` : `<p class="small muted" style="margin:0">${puzzle.size} × ${puzzle.size} board from Claude. Compare it with your screenshot.</p>`}
       <p class="small muted" style="margin:14px 0 0">Wrong colour somewhere? Pick a colour, then tap or drag over cells.</p>
       <div class="swatches" id="swatches">
         ${puzzle.colors.map((c, k) => `<button type="button" class="swatch ${k === imp.paint ? 'sel' : ''}" data-k="${k}" style="background:${c}" aria-label="Colour ${k + 1}"></button>`).join('')}
       </div>
-      <details class="crop" id="cropDetails" ${imp.cropOpen ? 'open' : ''}>
+      ${fromImage ? `<details class="crop" id="cropDetails" ${imp.cropOpen ? 'open' : ''}>
         <summary>Board in the wrong place? Adjust the crop</summary>
         <p class="small muted">Drag the box over the coloured squares (inside the thick outer border). Drag the blue dot to resize.</p>
         <div class="crop-clip"><div class="crop-stage" id="cropStage"><div class="crop-box" id="cropBox"><div class="crop-handle" id="cropHandle"></div></div></div></div>
-      </details>
+      </details>` : ''}
     </div>
     <div class="row">
       <button class="btn ghost" id="cancelImport" type="button">Cancel</button>
       <span class="spacer"></span>
-      <button class="btn" id="otherShot" type="button">Other image</button>
-      <button class="btn primary" id="startBtn" type="button" ${check.level === 'bad' ? 'disabled' : ''}>Start puzzle</button>
+      ${fromImage ? '<button class="btn" id="otherShot" type="button">Other image</button>' : ''}
+      <button class="btn primary" id="startBtn" type="button" ${check.level === 'bad' ? 'disabled' : ''}>${imp.fromLink ? `Send to ${esc(CONFIG.player)}'s app` : 'Start puzzle'}</button>
     </div>`;
 
   const board = document.getElementById('board');
   buildBoard(board, puzzle, { editing: true });
   attachPaintInput(board);
 
-  document.getElementById('sizeDown').onclick = () => changeSize(-1);
-  document.getElementById('sizeUp').onclick = () => changeSize(1);
+  if (fromImage) {
+    document.getElementById('sizeDown').onclick = () => changeSize(-1);
+    document.getElementById('sizeUp').onclick = () => changeSize(1);
+    document.getElementById('cropDetails').ontoggle = e => { imp.cropOpen = e.target.open; };
+    setupCrop();
+  }
   document.getElementById('swatches').onclick = e => {
     const k = e.target.closest('.swatch')?.dataset.k;
     if (k == null) return;
     imp.paint = Number(k);
     document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('sel', s.dataset.k === k));
   };
-  document.getElementById('cropDetails').ontoggle = e => { imp.cropOpen = e.target.open; };
   document.getElementById('cancelImport').onclick = () => { state.importing = null; show('play'); };
-  document.getElementById('otherShot').onclick = () => $fileInput.click();
+  if (fromImage) document.getElementById('otherShot').onclick = () => $fileInput.click();
   document.getElementById('startBtn').onclick = startImported;
-  setupCrop();
 }
 
+// ---------- board codes from Claude ----------
+
+// A link from Claude (#q=<board code>) opens the board ready to send to
+// Katy's app: it's saved to Supabase and her phone picks it up.
+function openCode({ code, date }) {
+  const { puzzle, error } = parseCode(code);
+  history.replaceState(null, '', location.pathname + location.search);
+  if (error) { toast(error, 5000); return false; }
+  pauseClock();
+  state.importing = { puzzle, image: null, paint: 0, fromLink: true, date: date || state.date };
+  show('import');
+  return true;
+}
+
+function renderSent() {
+  const date = state.sentDate || state.date;
+  $app.innerHTML = `
+    <div class="card hero">
+      <div class="big-crown" style="width:56px;height:56px;margin:0 auto 8px;color:var(--gold)">${ICONS.crown}</div>
+      <h1>Sent to ${esc(CONFIG.player)}!</h1>
+      <p>The puzzle for ${esc(prettyDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))} is ready in ${esc(CONFIG.player)}'s app.</p>
+      ${store.remoteEnabled ? '' : `<p class="status warn" style="text-align:left">${ICONS.warn}<span>Supabase isn't set up yet, so it's only saved on this device. Add the keys in js/config.js.</span></p>`}
+      <button class="btn primary" id="sentDone" type="button">Done</button>
+    </div>`;
+  document.getElementById('sentDone').onclick = () => show('play');
+}
 function changeSize(delta) {
   const imp = state.importing;
   const n = Math.min(MAX_SIZE, Math.max(MIN_SIZE, imp.size + delta));
@@ -678,10 +729,17 @@ async function startImported() {
   imp.puzzle.regions.forEach((old, i) => { colors[regions[i]] = imp.puzzle.colors[old]; });
   const puzzle = { size: imp.puzzle.size, regions, colors };
 
-  store.clearProgress(state.date);
-  const res = await store.savePuzzle(state.date, puzzle);
+  const date = imp.date || state.date;
+  const res = await store.savePuzzle(date, puzzle);
   if (store.remoteEnabled && !res.synced) toast('Saved on this phone — will sync when back online.');
   state.importing = null;
+  if (imp.fromLink) {
+    if (date === state.date && !state.solved) { store.clearProgress(date); setPuzzle(puzzle); }
+    state.sentDate = date;
+    show('sent');
+    return;
+  }
+  store.clearProgress(state.date);
   setPuzzle(puzzle);
   show('play');
 }

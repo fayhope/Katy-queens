@@ -2,12 +2,20 @@
 
 A LinkedIn-style **Queens** puzzle app for Katy's phone.
 
-1. Screenshot the Queens board on LinkedIn (before you start playing it).
-2. Upload the screenshot in Katy Queens. It reads the grid and colours and
-   rebuilds the board — you get a chance to check it and fix any colours.
-3. Play it here against the clock. Katy's time and daily streak are saved.
-4. On the **Leaderboard** tab, type in Fay's time for the day. The app shows
-   who won today, win counts, streaks, personal bests, averages and history.
+**Each day:**
+
+1. **Fay** screenshots the Queens board on LinkedIn and sends it to Claude
+   (set up with [`CLAUDE_INSTRUCTIONS.md`](CLAUDE_INSTRUCTIONS.md)).
+2. Claude replies with a link. Fay taps it, checks the board matches, and
+   taps **Send to Katy's app**. The puzzle is saved to Supabase.
+3. **Katy** opens Katy Queens and today's board is waiting. She plays it
+   against the clock; her time and daily streak are saved.
+4. On the **Leaderboard** tab, Fay's time goes in. The app shows who won
+   today, win counts, streaks, personal bests, averages and history.
+
+Katy can also upload a screenshot herself ("Can't wait?" link): the app
+reads the board straight from the image, and lets you check and fix
+colours before playing.
 
 It's a static web app (plain HTML/CSS/JS, no build step) that installs to the
 iPhone home screen from Safari, and uses Supabase to store times so the
@@ -46,16 +54,17 @@ one device only.
 To change the names, edit `player` (who plays in the app) and `players`
 (everyone on the leaderboard) in `js/config.js`.
 
-### 2. Put it online
+### 2. Put it online with Vercel (free)
 
-It must be served over HTTPS for "Add to Home Screen" to work properly. Any
-static host works, for example:
+1. Sign in at [vercel.com](https://vercel.com) with GitHub.
+2. **Add New… → Project**, pick the `katy-queens` repository, **Import**.
+3. Leave every setting as it is (Framework preset: *Other*, no build
+   command) and press **Deploy**.
+4. You get an address like `https://katy-queens.vercel.app`. Put it into
+   the Claude instructions in place of `https://YOUR-SITE`.
 
-- **Netlify:** drag the project folder onto
-  [app.netlify.com/drop](https://app.netlify.com/drop), or connect this repo.
-- **Vercel:** "Add New Project", pick this repo, no settings needed.
-- **GitHub Pages:** Settings → Pages → deploy from the `main` branch
-  (needs a public repo on a free GitHub plan).
+Every push to the repository redeploys automatically. `vercel.json` stops
+browsers holding on to old versions of the app.
 
 ### 3. Install on the iPhone
 
@@ -77,6 +86,7 @@ npm test         # rules, streak maths and screenshot-reader tests
 | `js/queens.js` | Rules, clash detection and a solver (used to check an imported board) |
 | `js/stats.js` | Streaks, wins and the leaderboard |
 | `js/store.js` | Supabase REST calls with a local cache and offline retry queue |
+| `js/code.js` | Board codes (`POOOOOO.POOOBBO…`) used in Claude's links |
 | `js/app.js` | The screens: play, check-the-board, win, leaderboard |
 | `sw.js` | Offline support |
 
