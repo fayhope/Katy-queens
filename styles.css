@@ -166,12 +166,12 @@ main { max-width: 560px; margin: 0 auto; padding: 16px 16px 24px; }
 .cell.last-row { border-bottom: none; }
 
 .cell .mark { pointer-events: none; display: grid; place-items: center; width: 100%; height: 100%; }
-.cell.queen .mark svg { width: 62%; height: 62%; color: #000; }
+.cell.queen .mark svg { width: 62%; height: 62%; color: #f6b716; stroke: #9a6a00; stroke-width: 0.9; stroke-linejoin: round; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.15)); }
 .cell.x .mark::before, .cell.auto-x .mark::before {
   content: "×"; font-size: 52cqh; line-height: 1; color: rgba(0, 0, 0, 0.55); font-weight: 500;
 }
 .cell.auto-x .mark::before { color: rgba(0, 0, 0, 0.25); }
-.cell.bad.queen .mark svg { color: var(--red); color: #b3001b; }
+.cell.bad.queen .mark svg { color: #e0302b; stroke: #7a0010; }
 .cell.striped::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(-45deg, rgba(204, 16, 22, 0.32) 0 4px, transparent 4px 9px);

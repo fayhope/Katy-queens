@@ -41,3 +41,30 @@ test('reads a smaller, off-centre board on a beige page', () => {
   const rand = rng(5);
   check(randomPuzzle(9, rand), { boardX: 140, boardY: 900, boardSize: 640, background: [244, 242, 238] });
 });
+
+// A real LinkedIn screenshot (iPhone, light mode, already solved with gold
+// crowns and ×s on the board).
+test('reads a real LinkedIn Queens screenshot', async () => {
+  const { readPng, shrink } = await import('./png.mjs');
+  const { solve } = await import('../js/queens.js');
+  const full = readPng(new URL('./fixtures/linkedin-7x7-solved.png', import.meta.url).pathname);
+  const expected = [
+    0, 1, 1, 1, 1, 1, 1,
+    0, 1, 1, 1, 2, 2, 1,
+    1, 1, 1, 2, 2, 2, 2,
+    1, 1, 1, 3, 2, 2, 4,
+    5, 5, 5, 3, 3, 4, 4,
+    5, 5, 5, 3, 3, 4, 4,
+    5, 5, 5, 5, 3, 4, 6,
+  ];
+  for (const image of [shrink(full), full]) {
+    const { size, puzzle } = autoParse(image);
+    assert.equal(size, 7);
+    assert.deepEqual(puzzle.regions, expected);
+    assert.deepEqual(puzzle.colors, ['#bba3e2', '#ffc992', '#96beff', '#b3dfa0', '#dfdfdf', '#ff7b60', '#e6f388']);
+  }
+  const { count, solution } = solve(7, expected, 2);
+  assert.equal(count, 1);
+  // The queens in the screenshot: (0,0) (1,4) (2,1) (3,3) (4,5) (5,2) (6,6).
+  assert.deepEqual(solution, [0, 11, 15, 24, 33, 37, 48]);
+});
